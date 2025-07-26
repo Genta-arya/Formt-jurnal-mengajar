@@ -1,8 +1,15 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import Header from "../components/Header";
+import useUserStore from "../lib/Zustand/useUseStore";
+import Select from "react-select";
+import SelectGuru from "../components/SelectGuru";
+import SelectMapel from "../components/SelectMapel";
+import SelectKelas from "../components/SelectKelas";
 
 const JurnalMengajarForm = () => {
+  const { user, kelas, mapel } = useUserStore();
+
   const [formData, setFormData] = useState({
     namaGuru: "",
     tanggalMengajar: "",
@@ -12,13 +19,17 @@ const JurnalMengajarForm = () => {
     statusKehadiran: "",
     materi: "",
     kegiatan: [],
-    lainnyaKegiatan: "",
     siswaHadir: "",
     siswaTidakHadir: "",
     buktiFoto: null,
+    user_id: "",
   });
+  const [previewImage, setPreviewImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const [errors, setErrors] = useState({});
+
+  const DRAFT_KEY = "draftJurnalMengajar";
 
   const refs = {
     namaGuru: useRef(),
@@ -34,15 +45,53 @@ const JurnalMengajarForm = () => {
     siswaTidakHadir: useRef(),
     buktiFoto: useRef(),
   };
+  const fileInputRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
-    if (type === "file") {
-      setFormData({ ...formData, [name]: files[0] });
+
+    if (name === "namaGuru") {
+      const selectedUser = Array.isArray(user)
+        ? user.find((u) => u.name === value)
+        : null;
+
+      setFormData({
+        ...formData,
+        namaGuru: value,
+        user_id: selectedUser ? selectedUser.id : "",
+      });
+    } else if (type === "file") {
+      const file = files[0];
+      if (file) {
+        setFormData({ ...formData, [name]: file });
+        setPreviewImage(URL.createObjectURL(file));
+        setSelectedFile(file); // ✅ Tambahkan baris ini
+      }
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const isFilled = Object.values(formData).some((val) => {
+        if (typeof val === "string") return val.trim() !== "";
+        if (Array.isArray(val)) return val.length > 0;
+        return val !== null && val !== undefined;
+      });
+
+      if (isFilled) {
+        e.preventDefault();
+        e.returnValue = ""; // wajib di-set untuk trigger popup di browser
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [formData]);
 
   const handleCheckboxChange = (e) => {
     const { name, value, checked } = e.target;
@@ -101,6 +150,7 @@ const JurnalMengajarForm = () => {
     if (formData.kegiatan.includes("Lainnya")) {
       finalKegiatan.push(formData.lainnyaKegiatan);
     }
+    localStorage.removeItem(DRAFT_KEY);
 
     const finalData = { ...formData, kegiatan: finalKegiatan };
     console.log("SUBMIT:", finalData);
@@ -109,6 +159,7 @@ const JurnalMengajarForm = () => {
 
   const handleClearForm = () => {
     toast.success("Formulir berhasil dikosongkan.");
+    localStorage.removeItem(DRAFT_KEY);
     setFormData({
       namaGuru: "",
       tanggalMengajar: "",
@@ -123,6 +174,8 @@ const JurnalMengajarForm = () => {
       siswaTidakHadir: "",
       buktiFoto: null,
     });
+    setSelectedFile(null);
+    setPreviewImage(null);
     setErrors({});
 
     // Scroll ke atas
@@ -132,12 +185,19 @@ const JurnalMengajarForm = () => {
     });
   };
 
+  const handleRemove = () => {
+    setFormData({ ...formData, buktiFoto: null });
+    setPreviewImage(null);
+    fileInputRef.current.value = "";
+  };
+
   return (
     <div>
       <div className="">
         <div className="max-w-3xl mx-auto space-y-6">
           <Header />
           {/* Nama Guru */}
+
           <div
             ref={refs.namaGuru}
             className="bg-white p-4 rounded shadow border space-y-2"
@@ -145,18 +205,14 @@ const JurnalMengajarForm = () => {
             <label className="font-semibold">
               Nama Guru <span className="text-red-500">*</span>
             </label>
-            <select
-              name="namaGuru"
-              value={formData.namaGuru}
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.namaGuru ? "border-red-500" : ""
-              }`}
-            >
-              <option value="">Pilih</option>
-              <option value="Pak A">Pak A</option>
-              <option value="Bu B">Bu B</option>
-            </select>
+
+            <SelectGuru
+              errors={errors}
+              refs={refs}
+              user={user}
+              setFormData={setFormData}
+              formData={formData}
+            />
           </div>
 
           {/* Tanggal */}
@@ -183,19 +239,16 @@ const JurnalMengajarForm = () => {
             ref={refs.mataPelajaran}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Pilih Mata Pelajaran <span className="text-red-500">*</span></label>
-            <select
-              name="mataPelajaran"
-              value={formData.mataPelajaran}
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.mataPelajaran ? "border-red-500" : ""
-              }`}
-            >
-              <option value="">Pilih</option>
-              <option value="Matematika">Matematika</option>
-              <option value="Bahasa Indonesia">Bahasa Indonesia</option>
-            </select>
+            <label className="font-semibold">
+              Pilih Mata Pelajaran <span className="text-red-500">*</span>
+            </label>
+            <SelectMapel
+              Select={Select}
+              mapel={mapel}
+              errors={errors}
+              formData={formData}
+              setFormData={setFormData}
+            />
           </div>
 
           {/* Kelas */}
@@ -203,19 +256,16 @@ const JurnalMengajarForm = () => {
             ref={refs.kelas}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Pilih Kelas <span className="text-red-500">*</span></label>
-            <select
-              name="kelas"
-              value={formData.kelas}
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.kelas ? "border-red-500" : ""
-              }`}
-            >
-              <option value="">Pilih</option>
-              <option value="X RPL">X RPL</option>
-              <option value="XI TKJ">XI TKJ</option>
-            </select>
+            <label className="font-semibold">
+              Pilih Kelas <span className="text-red-500">*</span>
+            </label>
+            <SelectKelas
+              Select={Select}
+              kelas={kelas}
+              formData={formData}
+              setFormData={setFormData}
+              errors={errors}
+            />
           </div>
 
           {/* Jam Ke */}
@@ -223,10 +273,15 @@ const JurnalMengajarForm = () => {
             ref={refs.jamKe}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Jam Ke <span className="text-red-500">*</span></label>
+            <label className="font-semibold">
+              Jam Ke <span className="text-red-500">*</span>
+            </label>
             <div className="flex flex-col gap-4">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((jam) => (
-                <label  key={jam} className="flex border-b pb-1 items-center space-x-2">
+                <label
+                  key={jam}
+                  className="flex border-b pb-1 items-center space-x-2"
+                >
                   <input
                     className="w-5 h-5 mr-2 "
                     type="checkbox"
@@ -246,7 +301,9 @@ const JurnalMengajarForm = () => {
             ref={refs.statusKehadiran}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Status Kehadiran <span className="text-red-500">*</span></label>
+            <label className="font-semibold">
+              Status Kehadiran <span className="text-red-500">*</span>
+            </label>
             <select
               name="statusKehadiran"
               value={formData.statusKehadiran}
@@ -257,7 +314,9 @@ const JurnalMengajarForm = () => {
             >
               <option value="">Pilih</option>
               <option value="Hadir">Hadir</option>
-              <option value="Tidak Hadir">Tidak Hadir</option>
+              <option value="Izin">Izin</option>
+              <option value="Sakit">Sakit</option>
+              <option value="Dinas_Luar">Dinas Luar</option>
             </select>
           </div>
 
@@ -266,10 +325,13 @@ const JurnalMengajarForm = () => {
             ref={refs.materi}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Materi Pelajaran <span className="text-red-500">*</span></label>
+            <label className="font-semibold">
+              Materi Pelajaran <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="materi"
+              placeholder="Isikan Materi Pelajaran"
               value={formData.materi}
               onChange={handleChange}
               className={`w-full border p-2 rounded ${
@@ -283,7 +345,9 @@ const JurnalMengajarForm = () => {
             ref={refs.kegiatan}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Kegiatan Guru <span className="text-red-500">*</span></label>
+            <label className="font-semibold">
+              Kegiatan Guru <span className="text-red-500">*</span>
+            </label>
             <div className="grid lg:grid-cols-2 gap-2 ">
               {[
                 "MENGISI MATERI",
@@ -297,7 +361,7 @@ const JurnalMengajarForm = () => {
               ].map((keg) => (
                 <label className="border-b" key={keg}>
                   <input
-                  className="mr-3 "
+                    className="mr-3 "
                     type="checkbox"
                     name="kegiatan"
                     value={keg}
@@ -328,11 +392,14 @@ const JurnalMengajarForm = () => {
             ref={refs.siswaHadir}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Jumlah Siswa Hadir <span className="text-red-500">*</span></label>
+            <label className="font-semibold">
+              Jumlah Siswa Hadir <span className="text-red-500">*</span>
+            </label>
             <input
               type="number"
               name="siswaHadir"
               value={formData.siswaHadir}
+              placeholder="0"
               onChange={handleChange}
               className={`w-full border p-2 rounded ${
                 errors.siswaHadir ? "border-red-500" : ""
@@ -345,10 +412,13 @@ const JurnalMengajarForm = () => {
             ref={refs.siswaTidakHadir}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">Jumlah Siswa Tidak Hadir <span className="text-red-500">*</span></label>
+            <label className="font-semibold">
+              Jumlah Siswa Tidak Hadir <span className="text-red-500">*</span>
+            </label>
             <input
               type="number"
               name="siswaTidakHadir"
+              placeholder="0"
               value={formData.siswaTidakHadir}
               onChange={handleChange}
               className={`w-full border p-2 rounded ${
@@ -360,7 +430,7 @@ const JurnalMengajarForm = () => {
           {/* Bukti Foto */}
           <div
             ref={refs.buktiFoto}
-            className="bg-white p-4 rounded-xl shadow border space-y-2"
+            className="bg-white p-4  rounded-xl shadow border space-y-2"
           >
             <label className="font-semibold text-sm block">
               UPLOAD BUKTI FOTO KBM <span className="text-red-500">*</span>
@@ -372,7 +442,7 @@ const JurnalMengajarForm = () => {
             <p className="text-xs text-gray-400">
               Upload maksimum 10 file yang didukung. Maks 1 MB per file.
             </p>
-            <label className="inline-flex items-center justify-center px-4 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 cursor-pointer text-sm font-medium w-fit">
+            <label className="inline-flex  items-center justify-center px-4 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 cursor-pointer text-sm font-medium w-fit">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="w-4 h-4 mr-2"
@@ -389,15 +459,62 @@ const JurnalMengajarForm = () => {
               </svg>
               Tambahkan file
               <input
+                ref={fileInputRef}
                 type="file"
                 name="buktiFoto"
-                multiple
                 onChange={handleChange}
                 className="hidden"
               />
             </label>
             {errors.buktiFoto && (
               <p className="text-red-500 text-xs mt-1">{errors.buktiFoto}</p>
+            )}
+
+            {previewImage && selectedFile && (
+              <div className="mt-4 border-t">
+                <div className=" relative w-fit mx-auto space-y-2">
+                  {/* Tombol Hapus */}
+                  <button
+                    type="button"
+                    onClick={handleRemove}
+                    className="absolute top-2 right-2 bg-white rounded-full shadow p-1 hover:bg-red-500 hover:text-white transition"
+                    title="Hapus gambar"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Gambar Preview */}
+                  <img
+                    src={previewImage}
+                    alt="Preview Bukti Foto"
+                    className="max-w-xs rounded border"
+                  />
+
+                  {/* Info File */}
+                  <div className="text-center text-sm text-gray-600 mt-2">
+                    <p>{selectedFile.name}</p>
+                    <p>
+                      <strong>Ukuran:</strong>{" "}
+                      {selectedFile.size >= 1024 * 1024
+                        ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
+                        : `${(selectedFile.size / 1024).toFixed(2)} KB`}
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -407,14 +524,14 @@ const JurnalMengajarForm = () => {
           <button
             type="submit"
             onClick={handleSubmit}
-            className="bg-orange-700 lg:text-base text-sm hover:bg-orange-800 text-white px-6 py-2 rounded shadow"
+            className="bg-blue-700 w-full lg:text-base text-sm hover:bg-blue-800 text-white px-6 py-2 rounded shadow"
           >
             Kirim
           </button>
 
           <button
             onClick={handleClearForm}
-            className="text-orange-700 font-bold"
+            className="border border-gray-400 rounded  px-6 py-2 ml-2 text-blue-700 w-full hover:opacity-80 font-bold"
           >
             Kosongkan Formulir
           </button>
