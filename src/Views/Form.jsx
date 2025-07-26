@@ -46,7 +46,6 @@ const JurnalMengajarForm = () => {
     buktiFoto: useRef(),
   };
   const fileInputRef = useRef(null);
-
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
 
@@ -63,15 +62,36 @@ const JurnalMengajarForm = () => {
     } else if (type === "file") {
       const file = files[0];
       if (file) {
+        const allowedTypes = [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/webp",
+          "image/gif",
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+          toast.error(
+            "Hanya file gambar yang diperbolehkan (JPG, PNG, WEBP, dll)"
+          );
+          e.target.value = ""; // reset file input
+          return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error("Ukuran gambar maksimal 5MB");
+          e.target.value = ""; // reset file input
+          return;
+        }
+
         setFormData({ ...formData, [name]: file });
         setPreviewImage(URL.createObjectURL(file));
-        setSelectedFile(file); // ✅ Tambahkan baris ini
+        setSelectedFile(file);
       }
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
-
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       const isFilled = Object.values(formData).some((val) => {
@@ -440,7 +460,7 @@ const JurnalMengajarForm = () => {
               alasan ketidakhadiran
             </p>
             <p className="text-xs text-gray-400">
-              Upload maksimum 10 file yang didukung. Maks 1 MB per file.
+              Upload maksimum 1 file yang didukung. Maks 5 MB.
             </p>
             <label className="inline-flex  items-center justify-center px-4 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 cursor-pointer text-sm font-medium w-fit">
               <svg
@@ -473,40 +493,58 @@ const JurnalMengajarForm = () => {
 
             {previewImage && selectedFile && (
               <div className="mt-4 border-t">
-                <div className=" relative w-fit mx-auto space-y-2">
+                <div className="">
                   {/* Tombol Hapus */}
-                  <button
-                    type="button"
-                    onClick={handleRemove}
-                    className="absolute top-2 right-2 bg-white rounded-full shadow p-1 hover:bg-red-500 hover:text-white transition"
-                    title="Hapus gambar"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                  <div className="flex justify-center items-center mt-4 mb-4">
+                    <button
+                      type="button"
+                      onClick={handleRemove}
+                      className=" bg-white rounded-full px-4 shadow p-1 hover:bg-red-500 hover:text-white transition"
+                      title="Hapus gambar"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
+                      Hapus Gambar
+                    </button>
+                  </div>
 
                   {/* Gambar Preview */}
-                  <img
-                    src={previewImage}
-                    alt="Preview Bukti Foto"
-                    className="max-w-xs rounded border"
-                  />
+                  <div className="flex justify-center">
+                    <img
+                      src={previewImage}
+                      alt="Preview Bukti Foto"
+                      className=""
+                    />
+                  </div>
 
                   {/* Info File */}
-                  <div className="text-center text-sm text-gray-600 mt-2">
-                    <p>{selectedFile.name}</p>
+                  <div className="text-center cursor-default text-sm text-gray-600 mt-2">
+                    <p
+                      onClick={() => {
+                        const newWindow = window.open("", "_blank");
+
+                        if (newWindow) {
+                          newWindow.document.write(`
+        <html>
+          <head>
+            <title>Download</title>
+          </head>
+          <body>
+            <a id="downloadLink" href="${previewImage}" download="${selectedFile.name}">Download</a>
+            <script>
+              const link = document.getElementById('downloadLink');
+              link.click();
+              setTimeout(() => window.close(), 1000);
+            </script>
+          </body>
+        </html>
+      `);
+                          newWindow.document.close();
+                        }
+                      }}
+                      className="underline cursor-pointer hover:text-blue-600"
+                    >
+                      {selectedFile.name}
+                    </p>
+
                     <p>
                       <strong>Ukuran:</strong>{" "}
                       {selectedFile.size >= 1024 * 1024
