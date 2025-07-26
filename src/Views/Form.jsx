@@ -9,10 +9,10 @@ import SelectKelas from "../components/SelectKelas";
 
 const JurnalMengajarForm = () => {
   const { user, kelas, mapel } = useUserStore();
-
+const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
   const [formData, setFormData] = useState({
     namaGuru: "",
-    tanggalMengajar: "",
+    tanggalMengajar: today,
     mataPelajaran: "",
     kelas: "",
     jamKe: [],
