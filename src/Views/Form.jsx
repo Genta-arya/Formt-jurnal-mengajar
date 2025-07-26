@@ -462,6 +462,7 @@ const JurnalMengajarForm = () => {
                 ref={fileInputRef}
                 type="file"
                 name="buktiFoto"
+                accept="image/*"
                 onChange={handleChange}
                 className="hidden"
               />
