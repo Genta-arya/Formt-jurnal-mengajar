@@ -13,7 +13,7 @@ const App = () => {
   if (loadingUser) return <LoadingData />;
   return (
     <Container>
-      <TeachingJournalForm />
+      {!loadingUser && <TeachingJournalForm />}
 
       <Toaster
         position="bottom-center"
