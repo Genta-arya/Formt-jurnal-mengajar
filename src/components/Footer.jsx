@@ -4,8 +4,8 @@ const FooterFormulir = () => {
   return (
     <footer className="text-center text-sm text-gray-600 mt-10 px-4">
       <p>
-        Formulir ini milik ol SMKN 2 KETAPANG dalam naungan Kementerian
-        Pendidikan dan Kebudayaan Indonesia.
+        Formulir ini milik SMKN 2 KETAPANG dalam naungan Kementerian Pendidikan
+        dan Kebudayaan Indonesia.
         <br />
         <a
           href="https://www.smkn2ketapang.sch.id/kontak/"
