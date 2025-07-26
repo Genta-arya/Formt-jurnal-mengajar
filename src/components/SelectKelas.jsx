@@ -4,7 +4,7 @@ const SelectKelas = ({ formData, setFormData, errors, Select, kelas }) => {
   // Siapkan options
   const options = Array.isArray(kelas)
     ? kelas.map((u) => ({
-        value: u.id,
+        value: u.nama_kelas,
         label: u.nama_kelas,
         email: u.email,
         id: u.id,

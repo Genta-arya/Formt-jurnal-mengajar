@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import icon from "../assets/Icon.jpeg";
+import icon from "../assets/Icon.png";
 
 const LoadingData = () => {
   return (

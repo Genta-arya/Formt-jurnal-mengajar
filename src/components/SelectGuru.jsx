@@ -23,7 +23,7 @@ const SelectGuru = ({ formData, setFormData, errors, user }) => {
         setFormData({
           ...formData,
           namaGuru: selectedOption?.value || "",
-          user_id: selectedOption?.id || "",
+          userId: selectedOption?.id || "",
         });
       }}
       styles={{

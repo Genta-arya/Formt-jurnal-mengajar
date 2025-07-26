@@ -6,13 +6,21 @@ import Select from "react-select";
 import SelectGuru from "../components/SelectGuru";
 import SelectMapel from "../components/SelectMapel";
 import SelectKelas from "../components/SelectKelas";
-import { motion, AnimatePresence } from "framer-motion";
-import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
-import { FaLock } from "react-icons/fa";
-import { FaHouseLock } from "react-icons/fa6";
+import { AnimatePresence } from "framer-motion";
+import { FaUpload } from "react-icons/fa6";
+import Jamke from "../components/Jamke";
+import SelectKehadiran from "../components/SelectKehadiran";
+import MateriPelajaran from "../components/MateriPelajaran";
+import KegiatanGuru from "../components/KegiatanGuru";
+import JumlahSiswaHadir from "../components/JumlahSiswaHadir";
+import JumlahSiswaTH from "../components/JumlahSiswaTH";
+import ModalConfirm from "../components/ModalConfirm";
+import { uploadGambar } from "../services/User.servcies";
+import LoadingSubmit from "../components/LoadingSubmit";
+import { createJurnal } from "../services/Jurnal.services";
 const JurnalMengajarForm = () => {
   const { user, kelas, mapel } = useUserStore();
-  const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
+  const today = new Date().toISOString().split("T")[0];
   const [formData, setFormData] = useState({
     namaGuru: "",
     tanggalMengajar: today,
@@ -25,20 +33,17 @@ const JurnalMengajarForm = () => {
     siswaHadir: "",
     siswaTidakHadir: "",
     buktiFoto: null,
-    user_id: "",
+    userId: "",
   });
-
+  const [loading, setLoading] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [inputPassword, setInputPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-
   const [errors, setErrors] = useState({});
-
   const DRAFT_KEY = "draftJurnalMengajar";
-
   const refs = {
     namaGuru: useRef(),
     tanggalMengajar: useRef(),
@@ -65,7 +70,7 @@ const JurnalMengajarForm = () => {
       setFormData({
         ...formData,
         namaGuru: value,
-        user_id: selectedUser ? selectedUser.id : "",
+        userId: selectedUser ? selectedUser.id : "",
       });
     } else if (type === "file") {
       const file = files[0];
@@ -82,13 +87,13 @@ const JurnalMengajarForm = () => {
           toast.error(
             "Hanya file gambar yang diperbolehkan (JPG, PNG, WEBP, dll)"
           );
-          e.target.value = ""; // reset file input
+          e.target.value = "";
           return;
         }
 
         if (file.size > 5 * 1024 * 1024) {
           toast.error("Ukuran gambar maksimal 5MB");
-          e.target.value = ""; // reset file input
+          e.target.value = "";
           return;
         }
 
@@ -96,10 +101,21 @@ const JurnalMengajarForm = () => {
         setPreviewImage(URL.createObjectURL(file));
         setSelectedFile(file);
       }
+    } else if (name === "siswaHadir" || name === "siswaTidakHadir") {
+      const onlyDigits = /^\d+$/; // hanya angka 0-9, tidak termasuk e, -, .
+
+      if (value === "" || onlyDigits.test(value)) {
+        setFormData({ ...formData, [name]: value });
+      } else {
+        toast.warning(
+          "Input hanya boleh angka tanpa simbol, minus, atau huruf."
+        );
+      }
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
+
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       const isFilled = Object.values(formData).some((val) => {
@@ -110,7 +126,7 @@ const JurnalMengajarForm = () => {
 
       if (isFilled) {
         e.preventDefault();
-        e.returnValue = ""; // wajib di-set untuk trigger popup di browser
+        e.returnValue = "";
       }
     };
 
@@ -133,10 +149,9 @@ const JurnalMengajarForm = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
-
     if (!formData.namaGuru) newErrors.namaGuru = "Nama guru wajib dipilih.";
     if (!formData.tanggalMengajar)
       newErrors.tanggalMengajar = "Tanggal wajib diisi.";
@@ -151,7 +166,7 @@ const JurnalMengajarForm = () => {
       newErrors.kegiatan = "Pilih kegiatan guru.";
     if (
       formData.kegiatan.includes("Lainnya") &&
-      !formData.lainnyaKegiatan.trim()
+      !(formData.lainnyaKegiatan || "").trim()
     ) {
       newErrors.lainnyaKegiatan = "Isi kegiatan lainnya.";
     }
@@ -173,40 +188,107 @@ const JurnalMengajarForm = () => {
       return;
     }
 
-    setErrors({});
-    const finalKegiatan = [...formData.kegiatan.filter((k) => k !== "Lainnya")];
-    if (formData.kegiatan.includes("Lainnya")) {
-      finalKegiatan.push(formData.lainnyaKegiatan);
-    }
-    setShowPasswordModal(true);
+    setLoading(true);
 
-    // const finalData = { ...formData, kegiatan: finalKegiatan };
-    // console.log("SUBMIT:", finalData);
-    // toast.success("Form berhasil dikirim!");
+    try {
+      // Cek apakah buktiFoto sudah berupa URL, skip upload kalau iya
+      let fileUrl = formData.buktiFoto;
+      const isUrl = typeof fileUrl === "string" && fileUrl.startsWith("http");
+
+      if (!isUrl) {
+        const formUpload = new FormData();
+        formUpload.append("file", formData.buktiFoto);
+
+        try {
+          const upload = await uploadGambar(formUpload);
+          fileUrl = upload.data.file_url;
+        } catch (err) {
+          console.error("Upload gagal:", err);
+          toast.error(
+            "Gagal mengupload bukti foto ke Server. Silakan coba lagi."
+          );
+          return; // 🚫 stop proses jika upload gagal
+        }
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        buktiFoto: fileUrl,
+      }));
+
+      setErrors({});
+      const finalKegiatan = [
+        ...formData.kegiatan.filter((k) => k !== "Lainnya"),
+      ];
+      if (formData.kegiatan.includes("Lainnya")) {
+        finalKegiatan.push(formData.lainnyaKegiatan);
+      }
+
+      setShowPasswordModal(true);
+    } catch (error) {
+      console.error("Terjadi kesalahan:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const submitFormFinal = () => {
+  const submitFormFinal = async () => {
     if (inputPassword !== "smk2hebat") {
       toast.error("Password salah.");
       return;
     }
+    setLoading(true);
+    try {
+      setIsSubmitting(true);
+      setShowPasswordModal(false);
+      setInputPassword("");
 
-    setIsSubmitting(true);
-    setShowPasswordModal(false);
-    setInputPassword("");
+      const finalKegiatan = [
+        ...formData.kegiatan.filter((k) => k !== "Lainnya"),
+      ];
+      if (formData.kegiatan.includes("Lainnya")) {
+        finalKegiatan.push(formData.lainnyaKegiatan);
+      }
 
-    const finalKegiatan = [...formData.kegiatan.filter((k) => k !== "Lainnya")];
-    if (formData.kegiatan.includes("Lainnya")) {
-      finalKegiatan.push(formData.lainnyaKegiatan);
+      localStorage.removeItem(DRAFT_KEY);
+
+      const finalData = { ...formData, kegiatan: finalKegiatan };
+
+      const response = await createJurnal(finalData);
+      console.log(response);
+      console.log("SUBMIT:", finalData);
+      toast.success("Form berhasil dikirim!");
+      // kosongkan form
+      localStorage.removeItem(DRAFT_KEY);
+      setFormData({
+        namaGuru: "",
+        tanggalMengajar: today,
+        mataPelajaran: "",
+        kelas: "",
+        jamKe: [],
+        statusKehadiran: "",
+        materi: "",
+        kegiatan: [],
+        lainnyaKegiatan: "",
+        siswaHadir: "",
+        siswaTidakHadir: "",
+        buktiFoto: null,
+      });
+      setSelectedFile(null);
+      setPreviewImage(null);
+      setErrors({});
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error("Terjadi kesalahan:", error);
+      toast.error("Terjadi kesalahan pada server Gagal mengirim formulir.");
+    } finally {
+      setLoading(false);
     }
-
-    localStorage.removeItem(DRAFT_KEY);
-
-    const finalData = { ...formData, kegiatan: finalKegiatan };
-    console.log("SUBMIT:", finalData);
-    toast.success("Form berhasil dikirim!");
-
-    setIsSubmitting(false);
   };
 
   const handleClearForm = () => {
@@ -229,8 +311,6 @@ const JurnalMengajarForm = () => {
     setSelectedFile(null);
     setPreviewImage(null);
     setErrors({});
-
-    // Scroll ke atas
     window.scrollTo({
       top: 0,
       behavior: "smooth",
@@ -248,8 +328,6 @@ const JurnalMengajarForm = () => {
       <div className="">
         <div className="max-w-3xl mx-auto space-y-6">
           <Header />
-          {/* Nama Guru */}
-
           <div
             ref={refs.namaGuru}
             className="bg-white p-4 rounded shadow border space-y-2"
@@ -266,8 +344,6 @@ const JurnalMengajarForm = () => {
               formData={formData}
             />
           </div>
-
-          {/* Tanggal */}
           <div
             ref={refs.tanggalMengajar}
             className="bg-white p-4 rounded shadow border space-y-2"
@@ -285,8 +361,6 @@ const JurnalMengajarForm = () => {
               }`}
             />
           </div>
-
-          {/* Mata Pelajaran */}
           <div
             ref={refs.mataPelajaran}
             className="bg-white p-4 rounded shadow border space-y-2"
@@ -319,8 +393,6 @@ const JurnalMengajarForm = () => {
               errors={errors}
             />
           </div>
-
-          {/* Jam Ke */}
           <div
             ref={refs.jamKe}
             className="bg-white p-4 rounded shadow border space-y-2"
@@ -328,27 +400,11 @@ const JurnalMengajarForm = () => {
             <label className="font-semibold">
               Jam Ke <span className="text-red-500">*</span>
             </label>
-            <div className="flex flex-col gap-4">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((jam) => (
-                <label
-                  key={jam}
-                  className="flex border-b pb-1 items-center space-x-2"
-                >
-                  <input
-                    className="w-5 h-5 mr-2 "
-                    type="checkbox"
-                    name="jamKe"
-                    value={jam}
-                    checked={formData.jamKe.includes(String(jam))}
-                    onChange={handleCheckboxChange}
-                  />
-                  <span>{jam}</span>
-                </label>
-              ))}
-            </div>
+            <Jamke
+              formData={formData}
+              handleCheckboxChange={handleCheckboxChange}
+            />
           </div>
-
-          {/* Status Kehadiran */}
           <div
             ref={refs.statusKehadiran}
             className="bg-white p-4 rounded shadow border space-y-2"
@@ -356,130 +412,54 @@ const JurnalMengajarForm = () => {
             <label className="font-semibold">
               Status Kehadiran <span className="text-red-500">*</span>
             </label>
-            <select
-              name="statusKehadiran"
-              value={formData.statusKehadiran}
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.statusKehadiran ? "border-red-500" : ""
-              }`}
-            >
-              <option value="">Pilih</option>
-              <option value="Hadir">Hadir</option>
-              <option value="Izin">Izin</option>
-              <option value="Sakit">Sakit</option>
-              <option value="Dinas_Luar">Dinas Luar</option>
-            </select>
+            <SelectKehadiran
+              errors={errors}
+              formData={formData}
+              handleChange={handleChange}
+            />
           </div>
-
-          {/* Materi */}
           <div
             ref={refs.materi}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">
-              Materi Pelajaran <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="materi"
-              placeholder="Isikan Materi Pelajaran"
-              value={formData.materi}
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.materi ? "border-red-500" : ""
-              }`}
+            <MateriPelajaran
+              errors={errors}
+              formData={formData}
+              handleChange={handleChange}
             />
           </div>
-
-          {/* Kegiatan Guru */}
           <div
             ref={refs.kegiatan}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">
-              Kegiatan Guru <span className="text-red-500">*</span>
-            </label>
-            <div className="grid lg:grid-cols-2 gap-2 ">
-              {[
-                "MENGISI MATERI",
-                "MENGISI TUGAS",
-                "PRAKTIK",
-                "KUNJUNGAN INDUSTRI",
-                "KUIS",
-                "MEMUTARKAN VIDEO PEMBELAJARAN",
-                "MEMBUAT PROYEK",
-                "Lainnya",
-              ].map((keg) => (
-                <label className="border-b" key={keg}>
-                  <input
-                    className="mr-3 "
-                    type="checkbox"
-                    name="kegiatan"
-                    value={keg}
-                    checked={formData.kegiatan.includes(keg)}
-                    onChange={handleCheckboxChange}
-                  />{" "}
-                  {keg}
-                </label>
-              ))}
-            </div>
-            {formData.kegiatan.includes("Lainnya") && (
-              <input
-                ref={refs.lainnyaKegiatan}
-                type="text"
-                name="lainnyaKegiatan"
-                placeholder="Tuliskan kegiatan lainnya"
-                value={formData.lainnyaKegiatan}
-                onChange={handleChange}
-                className={`w-full border p-2 rounded ${
-                  errors.lainnyaKegiatan ? "border-red-500" : ""
-                }`}
-              />
-            )}
+            <KegiatanGuru
+              formData={formData}
+              handleCheckboxChange={handleCheckboxChange}
+              refs={refs}
+              errors={errors}
+              handleChange={handleChange}
+            />
           </div>
-
-          {/* Jumlah Siswa Hadir */}
           <div
             ref={refs.siswaHadir}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">
-              Jumlah Siswa Hadir <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              name="siswaHadir"
-              value={formData.siswaHadir}
-              placeholder="0"
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.siswaHadir ? "border-red-500" : ""
-              }`}
+            <JumlahSiswaHadir
+              errors={errors}
+              formData={formData}
+              handleChange={handleChange}
             />
           </div>
-
-          {/* Jumlah Siswa Tidak Hadir */}
           <div
             ref={refs.siswaTidakHadir}
             className="bg-white p-4 rounded shadow border space-y-2"
           >
-            <label className="font-semibold">
-              Jumlah Siswa Tidak Hadir <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              name="siswaTidakHadir"
-              placeholder="0"
-              value={formData.siswaTidakHadir}
-              onChange={handleChange}
-              className={`w-full border p-2 rounded ${
-                errors.siswaTidakHadir ? "border-red-500" : ""
-              }`}
+            <JumlahSiswaTH
+              errors={errors}
+              formData={formData}
+              handleChange={handleChange}
             />
           </div>
-
-          {/* Bukti Foto */}
           <div
             ref={refs.buktiFoto}
             className="bg-white p-4  rounded-xl shadow border space-y-2"
@@ -495,21 +475,8 @@ const JurnalMengajarForm = () => {
               Upload maksimum 1 file yang didukung. Maks 5 MB.
             </p>
             <label className="inline-flex  items-center justify-center px-4 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 cursor-pointer text-sm font-medium w-fit">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v6m0 0l-3-3m3 3l3-3m1-6a4 4 0 00-8 0v4h8V9z"
-                />
-              </svg>
-              Tambahkan file
+              <FaUpload className="mr-2" />
+              Upload
               <input
                 ref={fileInputRef}
                 type="file"
@@ -526,7 +493,6 @@ const JurnalMengajarForm = () => {
             {previewImage && selectedFile && (
               <div className="mt-4 border-t">
                 <div className="">
-                  {/* Tombol Hapus */}
                   <div className="flex justify-center items-center mt-4 mb-4">
                     <button
                       type="button"
@@ -537,8 +503,6 @@ const JurnalMengajarForm = () => {
                       Hapus Gambar
                     </button>
                   </div>
-
-                  {/* Gambar Preview */}
                   <div className="flex justify-center">
                     <img
                       src={previewImage}
@@ -546,8 +510,6 @@ const JurnalMengajarForm = () => {
                       className=""
                     />
                   </div>
-
-                  {/* Info File */}
                   <div className="text-center cursor-default text-sm text-gray-600 mt-2">
                     <p
                       onClick={() => {
@@ -588,8 +550,6 @@ const JurnalMengajarForm = () => {
               </div>
             )}
           </div>
-
-          {/* Tombol Submit */}
         </div>
         <div className="max-w-3xl bg-[#f4f1ee] mx-auto  mt-4 text-center font-bold items-center flex flex-col gap-2 justify-between">
           <button
@@ -611,70 +571,17 @@ const JurnalMengajarForm = () => {
 
       <AnimatePresence>
         {showPasswordModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed top-0 left-0 z-50 w-full h-full bg-black bg-opacity-50 flex justify-center items-center"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white p-6 rounded-xl shadow-lg w-[90%] max-w-md"
-            >
-
-             <FaHouseLock size={60} className="text-center mx-auto mb-4 text-red-500" />
-              <h2 className="text-xl font-semibold mb-4 text-center">
-                Konfirmasi Akses
-              </h2>
-              <p className="text-sm text-center mb-2">
-                Masukkan password untuk mengirim formulir.
-              </p>
-
-              {/* Input Password dengan Eye */}
-              <div className="relative mb-4">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={inputPassword}
-                  onChange={(e) => setInputPassword(e.target.value)}
-                  placeholder="Masukkan password"
-                  required
-                  className="w-full border p-2 rounded pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600"
-                >
-                  {showPassword ? (
-                    <AiOutlineEyeInvisible size={20} />
-                  ) : (
-                    <AiOutlineEye size={20} />
-                  )}
-                </button>
-              </div>
-
-              {/* Tombol Aksi */}
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2 border rounded hover:bg-gray-100"
-                >
-                  Batal
-                </button>
-                <button
-                  disabled={inputPassword === ""}
-                  onClick={submitFormFinal}
-                  className="px-4 py-2 disabled:bg-gray-500 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Kirim
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <ModalConfirm
+            inputPassword={inputPassword}
+            setInputPassword={setInputPassword}
+            setShowPassword={setShowPassword}
+            showPassword={showPassword}
+            setShowPasswordModal={setShowPasswordModal}
+            submitFormFinal={submitFormFinal}
+          />
         )}
       </AnimatePresence>
+      {loading && <LoadingSubmit />}
     </div>
   );
 };
