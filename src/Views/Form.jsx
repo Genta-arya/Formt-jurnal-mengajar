@@ -559,18 +559,18 @@ const JurnalMengajarForm = () => {
 
           {/* Tombol Submit */}
         </div>
-        <div className="max-w-3xl bg-[#f4f1ee] mx-auto  mt-4 text-center font-bold items-center flex flex-wrap justify-between">
+        <div className="max-w-3xl bg-[#f4f1ee] mx-auto  mt-4 text-center font-bold items-center flex flex-col gap-2 justify-between">
           <button
             type="submit"
             onClick={handleSubmit}
             className="bg-blue-700 w-full lg:text-base text-sm hover:bg-blue-800 text-white px-6 py-2 rounded shadow"
           >
-            Kirim
+            Submit
           </button>
 
           <button
             onClick={handleClearForm}
-            className="border border-gray-400 rounded text-xs  py-2.5 ml-2 text-blue-700 w-full hover:opacity-80 font-bold"
+            className="border border-gray-400 rounded text-xs  py-2.5  text-blue-700 w-full hover:opacity-80 font-bold"
           >
             Kosongkan Formulir
           </button>
