@@ -88,11 +88,12 @@ const JurnalMengajarForm = () => {
           "image/png",
           "image/webp",
           "image/gif",
+          "image/svg+xml",
         ];
 
         if (!allowedTypes.includes(file.type)) {
           toast.error(
-            "Hanya file gambar yang diperbolehkan (JPG, PNG, WEBP, dll)"
+            "Hanya file gambar yang diperbolehkan."
           );
           e.target.value = "";
           return;
@@ -115,7 +116,7 @@ const JurnalMengajarForm = () => {
         setFormData({ ...formData, [name]: value });
       } else {
         toast.warning(
-          "Input hanya boleh angka tanpa simbol, minus, atau huruf."
+          "Hanya boleh angka."
         );
       }
     } else {
