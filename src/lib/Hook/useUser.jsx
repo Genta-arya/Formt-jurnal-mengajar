@@ -20,8 +20,8 @@ const useUser = () => {
       console.log(error);
       toast.error(error.response?.data?.message || "Terjadi kesalahan pada server.");
     } finally {
-      // ⏱ delay 3 detik biar loading lebih smooth
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+  
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       setLoading(false);
     }
   };

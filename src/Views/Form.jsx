@@ -18,6 +18,8 @@ import ModalConfirm from "../components/ModalConfirm";
 import { uploadGambar } from "../services/User.servcies";
 import LoadingSubmit from "../components/LoadingSubmit";
 import { createJurnal } from "../services/Jurnal.services";
+import ModalClearConfirm from "../components/ModalKonfirmasiClearForm";
+import { s } from "framer-motion/client";
 const JurnalMengajarForm = () => {
   const { user, kelas, mapel } = useUserStore();
   const today = new Date().toISOString().split("T")[0];
@@ -35,9 +37,14 @@ const JurnalMengajarForm = () => {
     buktiFoto: null,
     userId: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [inputPassword, setInputPassword] = useState("");
+  const [showClearFormModal, setShowClearFormModal] = useState(false);
+
+
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -291,12 +298,12 @@ const JurnalMengajarForm = () => {
     }
   };
 
-  const handleClearForm = () => {
+  const clearFormFinal = () => {
     toast.success("Formulir berhasil dikosongkan.");
     localStorage.removeItem(DRAFT_KEY);
     setFormData({
       namaGuru: "",
-      tanggalMengajar: "",
+      tanggalMengajar: today,
       mataPelajaran: "",
       kelas: "",
       jamKe: [],
@@ -307,14 +314,15 @@ const JurnalMengajarForm = () => {
       siswaHadir: "",
       siswaTidakHadir: "",
       buktiFoto: null,
+      userId: "",
     });
     setSelectedFile(null);
     setPreviewImage(null);
     setErrors({});
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    
+    setShowClearFormModal(false);
   };
 
   const handleRemove = () => {
@@ -561,7 +569,7 @@ const JurnalMengajarForm = () => {
           </button>
 
           <button
-            onClick={handleClearForm}
+            onClick={() => setShowClearFormModal(true)}
             className="border border-gray-400 rounded text-xs  py-2.5  text-blue-700 w-full hover:opacity-80 font-bold"
           >
             Kosongkan Formulir
@@ -581,6 +589,19 @@ const JurnalMengajarForm = () => {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showClearFormModal && (
+          <ModalClearConfirm
+            onCancel={() => setShowClearFormModal(false)}
+            onConfirm={() => {
+              clearFormFinal();
+              setShowClearFormModal(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {loading && <LoadingSubmit />}
     </div>
   );

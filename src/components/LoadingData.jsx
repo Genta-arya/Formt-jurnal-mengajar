@@ -34,7 +34,7 @@ const LoadingData = () => {
           duration: 1.5,
           repeat: Infinity,
         }}
-        className="text-sm text-gray-600 font-medium"
+        className="text-sm text-gray-600 font-bold"
       >
         Sedang mengambil data...
       </motion.div>
