@@ -10,6 +10,8 @@ const App = () => {
   const { fetchUser, loadingUser } = useUser();
   useEffect(() => {
     fetchUser();
+
+    window.scrollTo(0, 0);
   }, []);
   if (loadingUser) return <LoadingData />;
   return (
