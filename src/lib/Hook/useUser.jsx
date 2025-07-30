@@ -4,8 +4,18 @@ import { getUser } from "../../services/User.servcies";
 import { toast } from "sonner";
 
 const useUser = () => {
-  const { user, setUser, kelas, setKelas, mapel, setMapel, web, setWeb } =
-    useUserStore();
+  const {
+    user,
+    setUser,
+    kelas,
+    setKelas,
+    mapel,
+    setMapel,
+    web,
+    setWeb,
+    kegiatan,
+    setKegiatan,
+  } = useUserStore();
   const [loading, setLoading] = React.useState(false);
 
   const fetchUser = async () => {
@@ -15,12 +25,14 @@ const useUser = () => {
       setUser(response.data.user);
       setKelas(response.data.kelas);
       setMapel(response.data.mapel);
+      setKegiatan(response.data.kegiatan);
       setWeb(response.data.web);
     } catch (error) {
       console.log(error);
-      toast.error(error.response?.data?.message || "Terjadi kesalahan pada server.");
+      toast.error(
+        error.response?.data?.message || "Terjadi kesalahan pada server."
+      );
     } finally {
-  
       await new Promise((resolve) => setTimeout(resolve, 2000));
       setLoading(false);
     }
@@ -29,6 +41,7 @@ const useUser = () => {
   return {
     fetchUser,
     loadingUser: loading,
+    kegiatan,
     user,
     kelas,
     web,

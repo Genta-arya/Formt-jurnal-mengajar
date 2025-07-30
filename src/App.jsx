@@ -9,8 +9,13 @@ import FooterFormulir from "./components/Footer";
 const App = () => {
   const { fetchUser, loadingUser } = useUser();
   useEffect(() => {
-    fetchUser();
+    // Redirect jika path adalah "/login"
+    if (window.location.pathname === "/login") {
+      window.location.href = "https://dashboard-si-jurnal.vercel.app/";
+      return;
+    }
 
+    fetchUser();
     window.scrollTo(0, 0);
   }, []);
   if (loadingUser) return <LoadingData />;
