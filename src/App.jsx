@@ -11,7 +11,7 @@ const App = () => {
   useEffect(() => {
     // Redirect jika path adalah "/login"
     if (window.location.pathname === "/login") {
-      window.location.href = "https://dashboard-si-jurnal.vercel.app/";
+      window.location.href = "https://dashboard.sijurnal.smkn2ketapang.sch.id/";
       return;
     }
 
